@@ -1,60 +1,122 @@
+
 import './style.css'
-import heroImg from './assets/hero.png'
-import javascriptLogo from './assets/javascript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.js'
+import { Chess } from 'chess.js'
+
+const game = new Chess()
+
+let selectedSquare = null
+let legalTargets = []
+
+const pieces = {
+  wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
+  bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟'
+}
 
 document.querySelector('#app').innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${javascriptLogo}" class="framework" alt="JavaScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.js</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+  <main class="container">
+    <h1>ChessLab</h1>
+    <p class="subtitle">Player vs Bot Chess Platform</p>
 
-<div class="ticks"></div>
+    <div id="status">White to move</div>
+    <div id="board"></div>
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript" target="_blank">
-          <img class="button-icon" src="${javascriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
-
-<div class="ticks"></div>
-<section id="spacer"></section>
+    <button id="restart">Restart Game</button>
+  </main>
 `
 
-setupCounter(document.querySelector('#counter'))
+const boardElement = document.querySelector('#board')
+const statusElement = document.querySelector('#status')
+
+function renderBoard() {
+  const board = game.board()
+  boardElement.innerHTML = ''
+
+  board.forEach((rank, row) => {
+    rank.forEach((piece, col) => {
+      const square = String.fromCharCode(97 + col) + (8 - row)
+      const cell = document.createElement('button')
+
+      cell.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`
+      cell.dataset.square = square
+
+      if (piece) {
+        cell.textContent = pieces[
+          piece.color + piece.type
+        ]
+      }
+
+      if (square === selectedSquare) {
+        cell.classList.add('selected')
+      }
+
+      if (legalTargets.includes(square)) {
+        cell.classList.add('legal')
+      }
+
+      cell.addEventListener('click', () => handleSquareClick(square))
+
+      boardElement.appendChild(cell)
+    })
+  })
+
+  updateStatus()
+}
+
+function updateStatus() {
+  if (game.isCheckmate()) {
+    statusElement.textContent =
+      `Checkmate! ${game.turn() === 'w' ? 'Black' : 'White'} wins.`
+  } else if (game.isDraw()) {
+    statusElement.textContent = 'Draw!'
+  } else {
+    statusElement.textContent =
+      `${game.turn() === 'w' ? 'White' : 'Black'} to move` +
+      (game.isCheck() ? ' — Check!' : '')
+  }
+}
+
+function handleSquareClick(square) {
+  if (game.isGameOver()) return
+
+  if (selectedSquare && legalTargets.includes(square)) {
+    try {
+      game.move({
+        from: selectedSquare,
+        to: square,
+        promotion: 'q'
+      })
+
+      selectedSquare = null
+      legalTargets = []
+      renderBoard()
+      return
+    } catch {
+      // Ignore invalid moves
+    }
+  }
+
+  const piece = game.get(square)
+
+  if (piece && piece.color === game.turn()) {
+    selectedSquare = square
+
+    legalTargets = game.moves({
+      square,
+      verbose: true
+    }).map(move => move.to)
+  } else {
+    selectedSquare = null
+    legalTargets = []
+  }
+
+  renderBoard()
+}
+
+document.querySelector('#restart').addEventListener('click', () => {
+  game.reset()
+  selectedSquare = null
+  legalTargets = []
+  renderBoard()
+})
+
+renderBoard()
